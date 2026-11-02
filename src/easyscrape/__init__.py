@@ -1,6 +1,3 @@
-"""EasyScrape: adapter-based batch media downloads."""
+"""EasyScrape: five social platforms, five download services."""
 
-from .models import DownloadContext, DownloadError, MediaResult, RetryableError
-
-__version__ = "0.1.0"
-__all__ = ["DownloadContext", "DownloadError", "MediaResult", "RetryableError"]
+__version__ = "0.2.0"

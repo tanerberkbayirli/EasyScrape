@@ -1,126 +1,58 @@
 # EasyScrape
 
-EasyScrape, bir bağlantıdan ya da bağlantı listesinden medya indiren bir Python aracıdır. Hem **komut satırı** hem de küçük bir **arayüz** ile kullanılır. İndirmeyi kendisi yapmaz; video ve ses için **yt-dlp**, görsel galerileri için **gallery-dl** kullanır ve her bağlantıyı uygun eklentiye yönlendirir. DRM veya erişim kısıtlarını aşmaz, telemetri göndermez.
+Bir video bağlantısı yapıştırın; EasyScrape platformu tanır, ilgili indirme servisine gönderir ve MP4 videoyu seçtiğiniz klasöre kaydeder. Varsayılan kayıt yeri Masaüstüdür.
 
-## Özellikler
+- X / Twitter → https://ssstwitter.com/
+- TikTok (vm/vt kısa linkleri dahil) → https://ssstik.io/
+- Instagram → https://reelsvideo.io/en-4
+- Reddit (redd.it kısa linkleri dahil) → https://redvid.io/
+- Pinterest (pin.it kısa linkleri dahil) → https://redvid.io/pinterest-downloader
 
-- **Tek araçta çok platform:** YouTube, YouTube Music, Spotify, X, Instagram, TikTok, Pinterest, SoundCloud ve yt-dlp / gallery-dl'nin desteklediği diğer siteler.
-- **Arayüz:** Linkleri yapıştırın ya da `.txt` / `.md` / `.json` dosyası seçin, "İndir"e basın. Varsayılan kayıt yeri Masaüstü'dür ve yalnızca indirilen dosyalar kaydedilir; rapor, metadata veya durum dosyası bırakılmaz. Her bölümün yanındaki **i** düğmesi kısa açıklama verir. Ctrl+Enter ile de indirilir.
-- **Çoklu kaynak:** Aynı anda birden çok URL ve dosya verilebilir. Metin dosyalarında bağlantıların çevresinde not ya da yorum olabilir; satırdaki tüm `http(s)://` bağlantıları alınır. Yinelenen bağlantılar bir kez indirilir.
-- **Spotify:** Parça, albüm ve playlist desteklenir. Spotify'dan metadata alınır; ses, başlık + sanatçı + süre eşleşmesiyle YouTube Music'ten indirilir (Spotify'ın kendi akışı değildir) ve etiketler yazılır. Remaster/yeniden basım sürümleri, başlık ve sanatçı aynıysa daha geniş süre toleransıyla eşleşir ve "yaklaşık eşleşme" uyarısı düşülür.
-- **Hata toleransı:** Başarısız bir bağlantı kaydedilir, kalanlar devam eder. `failed.json` dosyası verilerek yalnızca başarısızlar yeniden denenir. Daha önce inenler atlanır (`--force` ile yeniden indirilir).
-- **Ses seçenekleri:** `--audio-only` ve `--audio-format mp3|m4a|opus|flac|wav`. Yalnızca-ses kaynaklar (ör. SoundCloud) başarısız olmak yerine otomatik ses olarak iner.
-- **Kalite ve boyut sınırı:** `--max-height` ile video yüksekliği, `--max-items` ile koleksiyon başına öğe sayısı sınırlanır.
-- **Genel yedek:** yt-dlp başarısız olursa gallery-dl'nin desteklediği her site (Imgur, Tumblr, Bluesky, RedGifs...) denenir.
-- **Windows desteği:** Deno, Node.js, Bun veya QuickJS otomatik bulunup yt-dlp'ye verilir; Windows yolları temizlenir; indirilen videoda ffprobe ile video akışı doğrulanır.
-- **Çerez desteği:** Giriş gerektiren siteler için çerez dosyası ya da yerel tarayıcı profili kullanılabilir.
+Yalnızca bu beş platform ve video indirme desteklenir. Eski yt-dlp/gallery-dl adaptörleri, YouTube, Spotify, fotoğraf, ses dönüştürme, dosyadan/toplu indirme, kalite seçenekleri, çerez seçimi, rapor ve geçmiş özellikleri kaldırılmıştır.
 
-## Kurulum
+## Kurulum ve kullanım
 
-Python 3.10 veya üstü gerekir.
-
-```sh
-python -m pip install .
-easyscrape --help
-```
-
-Geliştirme için:
-
-```sh
-python -m pip install -e ".[dev]"
-```
-
-Çalışma zamanı bağımlılıkları: yt-dlp, gallery-dl, Rich, HTTPX, Mutagen, ytmusicapi ve TikTok için `curl-cffi`. `dev` ekstrası pytest, Ruff, mypy ve build araçlarını ekler.
-
-## Arayüzü açma
-
-```sh
-easyscrape-gui
-```
-
-ya da `python -m easyscrape.gui`. Pencere ekranın sağ alt köşesinde açılır. Windows'ta bir kısayol dosyasının "Kısayol tuşu" alanına bir tuş kombinasyonu (ör. Ctrl+Alt+E) atayarak arayüzü klavyeden de başlatabilirsiniz.
-
-Arayüzdeki seçenekler: link kutusu, dosya seçici, kayıt klasörü ve "Yalnızca ses". Diğer seçenekler (çözünürlük sınırı, çerez vb.) komut satırındadır.
-
-## Komut satırı
-
-Bir URL, bir metin dosyası ya da birkaçını birden verin. Boş satırlar ve `#` ile başlayan satırlar yok sayılır.
-
-```sh
-easyscrape "https://www.youtube.com/watch?v=VIDEO_ID"
-easyscrape links.txt --out ./indirilenler
-easyscrape links.txt --audio-only --limit-platform youtube,spotify
-easyscrape links.txt daha_fazla.txt "https://youtu.be/ID"   # birden çok kaynak
-easyscrape EasyScrape_Downloads/failed.json                  # yalnızca başarısızları yeniden dene
-easyscrape playlist.txt --max-items 5 --max-height 720       # koleksiyon ve çözünürlük sınırı
-easyscrape playlist.txt --audio-format mp3                   # sesi dönüştür (ffmpeg gerekir)
-```
-
-Varsayılan çıktı klasörü, girdi metin dosyasının yanındaki `EasyScrape_Downloads` klasörüdür (tek URL'de geçerli klasör). Medya platforma göre klasörlenir; metadata açıkken her öğenin yanına `metadata.json` yazılır. Çıktı kökünde ayrıca son çalıştırmanın `report.txt` ve `failed.json` dosyaları ile tamamlananları izleyen `.easyscrape-state.json` bulunur.
-
-Diğer seçenekler: `--no-metadata`, `--quiet`, `--limit-platform AD[,AD...]`, `--force`, `--version`. Tümü için `--help`.
-
-### Çerezler
-
-Bazı siteler giriş gerektirir. `--cookies DOSYA` ile Netscape biçiminde bir çerez dosyası verebilir ya da `--cookies-from-browser TARAYICI` ile yerel bir tarayıcı profilini okutabilirsiniz (firefox, chrome, edge, brave, chromium, opera, vivaldi, safari). İkisi birlikte kullanılamaz. Çerez dosyaları hesap erişimi sağlar: gizli tutun, depo dışında saklayın, asla commit etmeyin veya paylaşmayın. EasyScrape çerezleri kendi bir servisine yüklemez; ancak eklentiler, erişilen siteye gönderebilir.
-
-## Desteklenen kaynaklar ve sınırlar
-
-Destek, ilgili adaptöre, yukarı akış (upstream) çıkarıcıya ve belirli URL'ye bağlıdır.
-
-| Kaynak | Nasıl işlenir | Sınırlar |
-| --- | --- | --- |
-| YouTube | yt-dlp video ve koleksiyonları indirir. | Biçimler kaynağa bağlıdır; ayrı video ve ses akışlarını birleştirmek için ffmpeg gerekebilir. |
-| YouTube Music | `music.youtube.com` bağlantıları yt-dlp ile indirilir; Spotify eşleştirmesi de YouTube Music'te arar. | Sonuçlar herkese açık kataloğa ve kaynak biçimlerine bağlıdır. |
-| Diğer siteler | Genel yedek önce yt-dlp'yi, sonra gallery-dl'nin desteklediği siteleri dener. | Yalnızca iki aracın çıkarabildiği içerik. |
-| TikTok | yt-dlp ile; tarayıcı taklidi için `curl-cffi` (kurulumla gelir) kullanılır. | Fotoğraf slaytlarında video akışı yoktur, başarısız sayılır. |
-| Spotify parça, albüm, playlist | Herkese açık metadata, başlık, sanatçı ve süre (±2 sn) ile YouTube Music sonuçlarına eşleştirilir. İnen ses o eşleşmeden gelir. | Albüm ve playlistler Spotify'ın herkese açık gömme sayfasından okunur; bir playlistin en fazla ilk 100 parçası görünür, daha büyükse rapor uyarır. Eşleşme bulunamayan parça inmez. Özel akışlara erişilmez. Spotify FLAC sunmaz; ses yeniden kodlanmadan M4A/Opus olarak alınır, kalite kaynağa bağlıdır (çoğu zaman ~256 kbps). |
-| Instagram | Fotoğraf gönderileri gallery-dl, reel ve videolar yt-dlp ile. | Herkese açık reel'ler girişsiz denenir. Fotoğraf gönderileri, özel veya yaş kısıtlı reel'ler için çerez gerekir. |
-| Facebook | Fotoğraflar gallery-dl, videolar yt-dlp ile. | Giriş yapılmış tarayıcı oturumu gerekir. |
-| X ve Reddit | Karma medya gönderileri gallery-dl ile. | X herkese açık gönderilerde girişsiz çalışır. Reddit birçok ağda anonim istekleri engeller; çerez kullanın. |
-| Pinterest | Pinler gallery-dl ile. | gallery-dl'nin sunduğu içerikle sınırlıdır. |
-| Threads | Şu an hiçbir adaptör Threads indirmesini desteklemiyor. | Threads giriş ister ve yt-dlp ile gallery-dl'de uygun çıkarıcı yoktur. |
-
-`--audio-only`, uygun çıkarıcılardan ses ister; kaynağın kalitesini artırmaz. Bir site medyayı desteklenen çıkarıcılara açmıyorsa servisin resmi uygulamasını kullanın.
-
-### Windows medya araçları
-
-yt-dlp, YouTube için bir JavaScript çalışma ortamına ihtiyaç duyabilir. EasyScrape `PATH` üzerindeki Deno, Node.js, Bun veya QuickJS'i otomatik bulup yt-dlp'ye iletir; çalışma ortamını kendisi kurmaz. Windows'ta Deno için:
+Python 3.10+ ve Microsoft Edge veya Google Chrome gerekir.
 
 ```powershell
-winget install DenoLand.Deno
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install .
+.venv\Scripts\easyscrape-gui.exe
 ```
 
-Kurulumdan sonra PowerShell'i kapatıp açın ve kontrol edin:
+Edge/Chrome yoksa bir kez Chromium kurun:
 
 ```powershell
-deno --version
+.venv\Scripts\python.exe -m playwright install chromium
 ```
 
-yt-dlp çalışma ortamı bulamazsa rapora bir uyarı düşülür. Deno ya da başka bir ortam kurduktan sonra, önbelleğe alınmış bir öğeyi yeniden denemek için `--force` kullanın.
+Arayüzde bağlantıyı yapıştırıp **İndir** düğmesine veya Enter'a basın.
 
-Video indirmeleri için `PATH` üzerinde hem `ffmpeg` hem `ffprobe` sağlayan bir FFmpeg sürümü kurun:
+**Ayarlar** düğmesinden kayıt klasörünü ve uygulamayı açma kısayolunu seçebilirsiniz. Varsayılanlar **Masaüstü** ve **Ctrl + Shift + D**'dir. **Kaydet** ile seçimler hemen uygulanır ve yeniden açılışlarda korunur. Kullanımda olan bir kısayol seçilirse önceki kısayol korunur. **Varsayılanlara dön** düğmesi alanları ilk değerlere getirir; uygulamak için Kaydet'e basın. Ayarlar Windows'ta `%APPDATA%\EasyScrape\settings.json` dosyasında saklanır. Komut satırı da kayıt klasörü ayarını kullanır.
+
+Windows'ta uygulama seçilen kısayolu doğrudan dinler. Pencereyi kapatmak uygulamayı arka planda hazır tutar; aynı tuş veya kısayol mevcut pencereyi yeniden gösterir. Tamamen kapatmak için pencereye sağ tıklayıp **Tamamen çık** seçin. İndirme kütüphaneleri yalnızca indirme başlatıldığında yüklenir.
+
+Windows başlangıcında gizli çalıştırmak için kısayol hedefinde `pythonw.exe -m easyscrape.gui --background` kullanılabilir. Bu bilgisayarda Başlangıç klasörüne bu kısayol eklendi. Ctrl + Shift + D, uygulamanın kendi tuş dinleyicisi tarafından yönetildiğinden Windows kısayolunun “Kısayol tuşu” alanı boş bırakılır.
 
 ```powershell
-ffmpeg -version
-ffprobe -version
+.venv\Scripts\easyscrape.exe "https://x.com/kullanici/status/123456789"
 ```
 
-`ffprobe` varsa EasyScrape biten dosyada video akışı olup olmadığını kontrol eder. Yoksa yt-dlp'nin seçtiği biçim bilgisine bakar; video akışı seçildiği doğrulanamazsa indirmeyi reddeder.
+İndirme sırasında ayrı bir tarayıcı penceresi açılır. Bağlantı otomatik doldurulup gönderilir; sonuçtaki video bağlantıları işlenir. Servis CAPTCHA/insan doğrulaması isterse açılan tarayıcıda kendiniz tamamlayın. Formun kullanılabilir olması ve sonucun hazırlanması için ayrı ayrı en fazla üç dakika beklenir. Tarayıcıyı kapatmak işlemi durdurur. Koruma mekanizmaları aşılmaz.
 
-## Eklentiler (extractor)
+Video içeren MP4 dosyası doğrulandıktan sonra seçilen kayıt klasörüne `x_20261102_213000.mp4` gibi bir adla yazılır. Aynı adlı dosyalar ezilmez. Windows'ta OneDrive veya başka bir konuma yönlendirilmiş Masaüstü, sistem ayarından okunur. Geçici indirmeler temizlenir; kayıt klasörüne rapor veya metadata bırakılmaz.
 
-Çıkarıcı modülleri `src/easyscrape/extractors/` altındadır. Kayıt sistemi `MATCHERS` ve çağrılabilir bir `handle(url, context)` işlevi sunan modülleri bulur. Özel URL eşleştiricileri genel yedekten önce değerlendirilir. Her işleyici bir `MediaResult` listesi döndürür ve çıkarmayı bir yukarı akış adaptörüne devreder. Örnek için [CONTRIBUTING.md](CONTRIBUTING.md#çıkarıcı-ekleme) dosyasına bakın.
+İşlem sitelerin kullanılabilirliğine, herkese açık içeriği çözebilmesine ve sayfa yapısına bağlıdır. Özel hesaplar, silinmiş içerikler ve fotoğraf gönderileri video olarak indirilemez. Servisler değişirse form/sonuç seçicilerinin güncellenmesi gerekebilir. Video adresi seçilen üçüncü taraf servise gönderilir; medya o servisin sunduğu indirme bağlantısından alınır.
 
 ## Geliştirme
 
-Yerel kontroller:
-
-```sh
-python -m pytest
-ruff check .
-mypy src/easyscrape
-python -m build
+```powershell
+.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.venv\Scripts\python.exe -m playwright install chromium
+.venv\Scripts\python.exe -m pytest
+.venv\Scripts\python.exe -m ruff check .
+.venv\Scripts\python.exe -m mypy src/easyscrape
+.venv\Scripts\python.exe -m build
 ```
 
-GitHub Actions iş akışı bu kontrolleri Linux, Windows ve macOS üzerinde Python 3.10 ve 3.12 ile çalıştıracak şekilde ayarlıdır. CI canlı medya indirmez; çıkarıcı davranışları yerel örnek veriler ve sahte (mock) çağrılarla test edilmelidir.
+Testler dış servislerden video indirmez. Platform eşleştirmesi, geçersiz adresler, MP4/video kontrolü, dosya çakışmaları ve tarayıcı formundan yerel test sunucusuna indirme akışı sınanır.

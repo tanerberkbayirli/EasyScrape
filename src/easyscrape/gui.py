@@ -1,211 +1,289 @@
-"""Small Tk front end: paste links or pick link files, then run the CLI in a subprocess."""
+"""A single-link interface for downloading videos to the Desktop."""
 
 from __future__ import annotations
 
-import os
 import queue
-import re
-import shutil
-import subprocess
 import sys
 import tempfile
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, ttk
+from typing import TYPE_CHECKING
 
-from . import __version__
-
-_URL_RE = re.compile(r"https?://\S+")
-_FILE_TYPES = [
-    ("Link dosyaları", "*.txt *.md *.json *.csv *.list"),
-    ("Tüm dosyalar", "*.*"),
-]
-_HELP = (
-    "Linkleri kutuya yapıştırın (her satıra bir tane) ve/veya bir .txt, .md, .json dosyası "
-    "seçin; dosyadaki tüm linkler okunur.\n\n"
-    "Kayıt klasörü varsayılan olarak Masaüstü; sadece indirilen dosya kaydedilir.\n"
-    "Yalnızca ses: videoyu değil sadece sesi indirir.\n\n"
-    "Çalışır: YouTube, YouTube Music, Spotify, X, Instagram, TikTok, Pinterest, SoundCloud ve "
-    "yt-dlp / gallery-dl'nin desteklediği siteler.\n"
-    "Kısayol: Ctrl+Enter ile indirir."
+from .settings import (
+    DEFAULT_HOTKEY,
+    KEYS,
+    MODIFIERS,
+    Settings,
+    desktop_directory,
+    load_settings,
+    parse_hotkey,
+    save_settings,
 )
-_W, _H = 640, 250
-_BOOKKEEPING = {"report.txt", "failed.json", "metadata.json", ".easyscrape-state.json"}
 
-
-def _desktop() -> Path:
-    for candidate in (Path.home() / "Desktop", Path.home() / "OneDrive" / "Desktop"):
-        if candidate.is_dir():
-            return candidate
-    return Path.home()
-
-
-def _unique(target: Path) -> Path:
-    candidate, n = target, 1
-    while candidate.exists():
-        candidate = target.with_name(f"{target.stem} ({n}){target.suffix}")
-        n += 1
-    return candidate
-
-
-def _deliver(staging: Path, dest: Path) -> list[Path]:
-    """Move only the downloaded media out of the staging tree, flat, into dest."""
-    dest.mkdir(parents=True, exist_ok=True)
-    moved: list[Path] = []
-    for item in sorted(staging.rglob("*")):
-        if item.is_file() and item.name not in _BOOKKEEPING:
-            target = _unique(dest / item.name)
-            shutil.move(str(item), target)
-            moved.append(target)
-    return moved
+if TYPE_CHECKING:
+    from .activation import WindowsActivation
 
 
 class App(tk.Tk):
-    def __init__(self) -> None:
+    def __init__(
+        self, activation: WindowsActivation | None = None, background: bool = False,
+        preferences: Settings | None = None,
+    ) -> None:
         super().__init__()
-        self.title(f"EasyScrape {__version__}")
-        self.resizable(False, False)
-        self._proc: subprocess.Popen[str] | None = None
-        self._lines: queue.Queue[str | None] = queue.Queue()
-        self._files: list[str] = []
-        self._staging: Path | None = None
-        self._dest = _desktop()
-        self._build()
-        x = self.winfo_screenwidth() - _W - 12
-        y = self.winfo_screenheight() - _H - 64  # clear of the taskbar
-        self.geometry(f"{_W}x{_H}+{x}+{y}")
-        self.bind("<Control-Return>", lambda _e: self._start())
-        self.after(100, self._drain)
-
-    def _build(self) -> None:
-        body = ttk.Frame(self, padding=8)
+        self._activation = activation
+        self.preferences = preferences if preferences is not None else load_settings()
+        self._settings_window: SettingsDialog | None = None
+        self.withdraw()
+        self.title("EasyScrape")
+        self.geometry("600x240")
+        self._messages: queue.Queue[str | None] = queue.Queue()
+        self._busy = False
+        body = ttk.Frame(self, padding=16)
         body.pack(fill="both", expand=True)
+        header = ttk.Frame(body)
+        header.pack(fill="x")
+        ttk.Label(header, text="X · TikTok · Instagram · Reddit · Pinterest").pack(side="left")
+        ttk.Button(header, text="Ayarlar", command=self._open_settings).pack(side="right")
+        self._destination_text = tk.StringVar()
+        self._refresh_destination()
+        ttk.Label(body, textvariable=self._destination_text, wraplength=560).pack(
+            anchor="w", pady=(4, 12))
+        self.url = tk.StringVar()
+        self.entry = ttk.Entry(body, textvariable=self.url)
+        self.entry.pack(fill="x")
+        self.entry.focus_set()
+        self.button = ttk.Button(body, text="İndir", command=self._start)
+        self.button.pack(anchor="e", pady=10)
+        self.status = tk.StringVar(value="Hazır.")
+        ttk.Label(body, textvariable=self.status, wraplength=560).pack(anchor="w")
+        self.bind("<Return>", lambda _event: self._start())
+        self.protocol("WM_DELETE_WINDOW", self._close)
+        self._menu = tk.Menu(self, tearoff=False)
+        self._menu.add_command(label="Ayarlar", command=self._open_settings)
+        self._menu.add_separator()
+        self._menu.add_command(label="Tamamen çık", command=self._exit)
+        self.bind("<Button-3>", lambda event: self._menu.tk_popup(event.x_root, event.y_root))
+        self.after(100, self._drain)
+        if activation is not None:
+            self.after(25, self._check_activation)
+        if not background:
+            self._show()
 
-        left = ttk.Frame(body)
-        left.pack(side="left", fill="both", expand=True)
-        ttk.Label(left, text="Linkler (satır başına bir tane)").pack(anchor="w")
-        self.links = tk.Text(left, width=34, height=7, wrap="word", undo=True)
-        self.links.pack(fill="both", expand=True, pady=(2, 0))
-        self.links.focus_set()
+    def _show(self) -> None:
+        self.update_idletasks()
+        if sys.platform == "win32":
+            from .activation import position_bottom_right
 
-        right = ttk.Frame(body)
-        right.pack(side="left", fill="y", padx=(8, 0))
-        top = ttk.Frame(right)
-        top.pack(fill="x")
-        ttk.Button(top, text="Dosya seç...", command=self._pick_files).pack(side="left")
-        ttk.Button(
-            top, text="i", width=2, command=lambda: messagebox.showinfo("EasyScrape", _HELP)
-        ).pack(side="right")
-        self.files_label = ttk.Label(right, text="Dosya yok", foreground="gray", width=28)
-        self.files_label.pack(anchor="w", pady=2)
+            position_bottom_right(self.winfo_id())
+        else:
+            x = max(0, self.winfo_screenwidth() - self.winfo_width() - 12)
+            y = max(0, self.winfo_screenheight() - self.winfo_height() - 60)
+            self.geometry(f"+{x}+{y}")
+        self.deiconify()
+        self.lift()
+        self.attributes("-topmost", True)
+        self.after_idle(lambda: self.attributes("-topmost", False))
+        self.entry.focus_force()
+        if self._settings_window is not None and self._settings_window.winfo_exists():
+            self._settings_window.lift()
 
-        ttk.Label(right, text="Kayıt klasörü").pack(anchor="w", pady=(6, 0))
-        orow = ttk.Frame(right)
-        orow.pack(fill="x")
-        self.out = tk.StringVar(value=str(self._dest))
-        ttk.Entry(orow, textvariable=self.out, width=22).pack(side="left")
-        ttk.Button(orow, text="...", width=3, command=self._pick_out).pack(side="left", padx=2)
+    def _refresh_destination(self) -> None:
+        self._destination_text.set(f"Kayıt yeri: {self.preferences.output_directory}")
 
-        self.audio = tk.BooleanVar()
-        ttk.Checkbutton(right, text="Yalnızca ses", variable=self.audio).pack(anchor="w", pady=6)
-        self.start_btn = ttk.Button(right, text="İndir", command=self._start)
-        self.start_btn.pack(fill="x")
+    def _open_settings(self) -> None:
+        if self._settings_window is not None and self._settings_window.winfo_exists():
+            self._settings_window.lift()
+            return
+        self._settings_window = SettingsDialog(self)
 
-        self.log = tk.Text(self, height=5, state="disabled", wrap="none", font=("Consolas", 8))
-        self.log.pack(fill="x", padx=8, pady=(0, 8))
+    def _apply_settings(self, preferences: Settings) -> None:
+        directory = preferences.output_directory
+        if not directory.is_absolute():
+            raise ValueError("Tam bir klasör yolu seçin.")
+        directory.mkdir(parents=True, exist_ok=True)
+        # Detect unwritable folders before persisting them or changing the hotkey.
+        with tempfile.TemporaryFile(dir=directory):
+            pass
+        modifiers, key = parse_hotkey(preferences.hotkey)
+        previous = self.preferences
+        if self._activation is not None and not self._activation.change_hotkey(modifiers, key):
+            raise ValueError("Bu kısayol başka bir uygulamada kullanılıyor. Başka bir tuş seçin.")
+        try:
+            save_settings(preferences)
+        except OSError:
+            if self._activation is not None:
+                self._activation.change_hotkey(*parse_hotkey(previous.hotkey))
+            raise
+        self.preferences = preferences
+        self._refresh_destination()
+        self.status.set(f"Ayarlar kaydedildi. Kısayol: {preferences.hotkey}")
 
-    def _pick_files(self) -> None:
-        chosen = filedialog.askopenfilenames(parent=self, filetypes=_FILE_TYPES)
-        self._files = list(chosen)
-        names = ", ".join(Path(p).name for p in self._files)
-        self.files_label.configure(text=names or "Dosya yok", foreground="" if names else "gray")
-
-    def _pick_out(self) -> None:
-        chosen = filedialog.askdirectory(parent=self)
-        if chosen:
-            self.out.set(chosen)
+    def _check_activation(self) -> None:
+        if self._activation is not None and self._activation.consume_show():
+            self._show()
+        self.after(25, self._check_activation)
 
     def _start(self) -> None:
-        if self._proc is not None:
+        if self._busy:
             return
-        sources = _URL_RE.findall(self.links.get("1.0", "end")) + self._files
-        if not sources:
-            messagebox.showwarning("EasyScrape", "Link girin ya da dosya seçin.", parent=self)
+        url = self.url.get().strip()
+        if not url:
+            self.status.set("Bir video bağlantısı girin.")
             return
-        self._dest = Path(self.out.get().strip() or str(_desktop())).expanduser()
-        self._staging = Path(tempfile.mkdtemp(prefix="easyscrape-"))
-        cmd = [sys.executable, "-m", "easyscrape", *sources, "--out", str(self._staging)]
-        cmd.append("--no-metadata")
-        if self.audio.get():
-            cmd.append("--audio-only")
-        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "NO_COLOR": "1", "COLUMNS": "100"}
-        flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        try:
-            self._proc = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                encoding="utf-8", errors="replace", env=env, creationflags=flags,
-            )
-        except OSError as exc:
-            messagebox.showerror("EasyScrape", str(exc), parent=self)
-            return
-        self._clear_log()
-        self._write("İndiriliyor...\n")
-        self.start_btn.configure(state="disabled")
-        threading.Thread(target=self._reader, args=(self._proc,), daemon=True).start()
+        self._busy = True
+        self.button.configure(state="disabled")
+        self.entry.configure(state="disabled")
+        self.status.set("Servis açılıyor...")
+        threading.Thread(
+            target=self._download, args=(url, self.preferences.output_directory), daemon=True,
+        ).start()
 
-    def _reader(self, proc: subprocess.Popen[str]) -> None:
-        assert proc.stdout is not None
-        for line in proc.stdout:
-            self._lines.put(line)
-        proc.wait()
-        self._lines.put(None)
+    def _download(self, url: str, directory: Path) -> None:
+        try:
+            # Heavy browser/network libraries are needed only after clicking Download.
+            from .downloader import DownloadError, download_video
+
+            try:
+                path = download_video(url, log=self._messages.put, output_directory=directory)
+                self._messages.put(f"Kaydedildi: {path}")
+            except DownloadError as exc:
+                self._messages.put(f"İndirilemedi: {exc}")
+        except (ImportError, OSError) as exc:
+            self._messages.put(f"İndirilemedi: {exc}")
+        finally:
+            self._messages.put(None)
 
     def _drain(self) -> None:
         try:
             while True:
-                line = self._lines.get_nowait()
-                if line is None:
-                    code = self._proc.returncode if self._proc else 0
-                    self._proc = None
-                    self.start_btn.configure(state="normal")
-                    self._finish(code)
+                message = self._messages.get_nowait()
+                if message is None:
+                    self._busy = False
+                    self.button.configure(state="normal")
+                    self.entry.configure(state="normal")
                 else:
-                    self._write(line)
+                    self.status.set(message)
         except queue.Empty:
             pass
         self.after(100, self._drain)
 
-    def _finish(self, code: int) -> None:
-        moved: list[Path] = []
-        if self._staging is not None:
-            try:
-                moved = _deliver(self._staging, self._dest)
-            except OSError as exc:
-                self._write(f"Dosyalar taşınamadı: {exc}\n")
-            shutil.rmtree(self._staging, ignore_errors=True)
-            self._staging = None
-        for path in moved:
-            self._write(f"-> {path}\n")
-        if moved:
-            self._write(f"Bitti: {len(moved)} dosya {self._dest} klasörüne kaydedildi.\n")
+    def _close(self) -> None:
+        if self._busy:
+            self.status.set("İndirmeyi durdurmak için açılan tarayıcıyı kapatın.")
         else:
-            self._write("Hiç dosya indirilemedi.\n" if code else "Bitti.\n")
+            if self._activation is not None:
+                self.withdraw()
+            else:
+                self.destroy()
 
-    def _clear_log(self) -> None:
-        self.log.configure(state="normal")
-        self.log.delete("1.0", "end")
-        self.log.configure(state="disabled")
+    def _exit(self) -> None:
+        if self._busy:
+            self.status.set("İndirmeyi durdurmak için açılan tarayıcıyı kapatın.")
+        else:
+            self.destroy()
 
-    def _write(self, text: str) -> None:
-        self.log.configure(state="normal")
-        self.log.insert("end", text)
-        self.log.see("end")
-        self.log.configure(state="disabled")
+
+class SettingsDialog(tk.Toplevel):
+    def __init__(self, owner: App) -> None:
+        super().__init__(owner)
+        self.owner = owner
+        self.title("Ayarlar")
+        self.transient(owner)
+        self.resizable(False, False)
+        body = ttk.Frame(self, padding=16)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="Kayıt klasörü").pack(anchor="w")
+        folder_row = ttk.Frame(body)
+        folder_row.pack(fill="x", pady=(4, 16))
+        self.folder = tk.StringVar(value=str(owner.preferences.output_directory))
+        ttk.Entry(folder_row, textvariable=self.folder, width=48).pack(side="left", fill="x")
+        ttk.Button(folder_row, text="Seç…", command=self._browse).pack(side="left", padx=(6, 0))
+        ttk.Label(body, text="Uygulamayı açma kısayolu").pack(anchor="w")
+        shortcut_row = ttk.Frame(body)
+        shortcut_row.pack(fill="x", pady=(4, 12))
+        parts = owner.preferences.hotkey.split("+")
+        self.modifiers = {name: tk.BooleanVar(value=name in parts[:-1]) for name in MODIFIERS}
+        for name, variable in self.modifiers.items():
+            ttk.Checkbutton(shortcut_row, text=name, variable=variable).pack(
+                side="left", padx=(0, 8))
+        self.key = tk.StringVar(value=parts[-1])
+        ttk.Combobox(
+            shortcut_row, textvariable=self.key, values=KEYS, width=5, state="readonly",
+        ).pack(side="left")
+        self.error = tk.StringVar()
+        ttk.Label(body, textvariable=self.error, foreground="#b42318", wraplength=470).pack(
+            anchor="w", pady=(0, 8))
+        buttons = ttk.Frame(body)
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="Varsayılanlara dön", command=self._defaults).pack(side="left")
+        ttk.Button(buttons, text="Kaydet", command=self._save).pack(side="right")
+        ttk.Button(buttons, text="İptal", command=self.destroy).pack(side="right", padx=6)
+        self.bind("<Return>", lambda _event: self._save())
+        self.bind("<Escape>", lambda _event: self.destroy())
+        self.update_idletasks()
+        x = max(0, owner.winfo_rootx() + (owner.winfo_width() - self.winfo_width()) // 2)
+        y = max(0, owner.winfo_rooty() + (owner.winfo_height() - self.winfo_height()) // 2)
+        self.geometry(f"+{x}+{y}")
+        self.grab_set()
+
+    def _browse(self) -> None:
+        selected = filedialog.askdirectory(
+            parent=self, title="Kayıt klasörünü seçin", initialdir=self.folder.get(),
+        )
+        if selected:
+            self.folder.set(selected)
+
+    def _defaults(self) -> None:
+        self.folder.set(str(desktop_directory()))
+        for name, variable in self.modifiers.items():
+            variable.set(name in DEFAULT_HOTKEY.split("+")[:-1])
+        self.key.set("D")
+        self.error.set("")
+
+    def _save(self) -> None:
+        try:
+            if not self.folder.get().strip():
+                raise ValueError("Bir kayıt klasörü seçin.")
+            directory = Path(self.folder.get().strip()).expanduser()
+            shortcut = "+".join(
+                [name for name, variable in self.modifiers.items() if variable.get()]
+                + [self.key.get()]
+            )
+            parse_hotkey(shortcut)
+            self.owner._apply_settings(Settings(
+                None if directory == desktop_directory() else directory, shortcut,
+            ))
+        except (ValueError, OSError) as exc:
+            self.error.set(str(exc))
+            return
+        self.destroy()
 
 
 def main() -> int:
-    App().mainloop()
+    preferences = load_settings()
+    activation = None
+    if sys.platform == "win32":
+        from .activation import WindowsActivation
+
+        modifiers, key = parse_hotkey(preferences.hotkey)
+        activation = WindowsActivation(key=key, modifiers=modifiers)
+        if activation.already_running:
+            if "--background" not in sys.argv:
+                activation.show()
+            activation.close()
+            return 0
+    try:
+        app = App(
+            activation=activation, background="--background" in sys.argv, preferences=preferences,
+        )
+        if activation is not None and not activation.listen():
+            app.status.set(f"{preferences.hotkey} başka bir uygulama tarafından kullanılıyor.")
+        app.mainloop()
+    finally:
+        if activation is not None:
+            activation.close()
     return 0
 
 
