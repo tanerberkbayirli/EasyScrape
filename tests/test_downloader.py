@@ -33,6 +33,11 @@ VIDEO = box(b"ftyp", b"isom\0\0\0\0isommp42") + box(
 
 
 @pytest.mark.parametrize(("url", "platform"), [
+    ("https://www.youtube.com/watch?v=abc", "YouTube"),
+    ("https://youtu.be/abc", "YouTube"),
+    ("https://www.youtube.com/shorts/abc", "YouTube"),
+    ("https://m.youtube.com/watch?v=abc", "YouTube"),
+    ("https://music.youtube.com/watch?v=abc", "YouTube"),
     ("https://x.com/a/status/1", "X"),
     ("https://mobile.twitter.com/a/status/1", "X"),
     ("https://www.tiktok.com/@a/video/1", "TikTok"),
@@ -48,11 +53,15 @@ VIDEO = box(b"ftyp", b"isom\0\0\0\0isommp42") + box(
     (" HTTPS://X.COM/a/status/1 ", "X"),
 ])
 def test_platform_detection(url, platform):
-    assert resolve_service(url).platform == platform
+    service = resolve_service(url)
+    assert service.platform == platform
+    if platform == "YouTube":
+        assert service.url == "https://app.ytdown.to/tr37/"
 
 
 @pytest.mark.parametrize("url", [
-    "https://youtube.com/watch?v=abc", "https://spotify.com/track/abc", "links.txt", "",
+    "https://spotify.com/track/abc", "links.txt", "", "https://youtube.com.evil.test/watch?v=abc",
+    "https://evilyoutu.be/abc",
     "https://x.com.evil.test/video", "https://evilx.com/video", "https://x.com@evil.test/",
     "https://me:password@x.com/video", "file:///x.com/video", "https://x.com:123/video",
     "https://x.com:bad/video", "http://[broken", "https://instagram.com.evil.test/reel/1",
@@ -105,7 +114,7 @@ def test_cli_rejects_old_features():
 
 
 def test_cli_download_error(capsys):
-    assert main(["https://youtube.com/watch?v=abc"]) == 1
+    assert main(["https://spotify.com/track/abc"]) == 1
     assert "destekleniyor" in capsys.readouterr().err
 
 
@@ -205,21 +214,28 @@ def test_result_filter_preserves_video_with_audio(browser):
         page.close()
 
 
-def test_browser_native_blob_download(browser, tmp_path):
+@pytest.mark.parametrize("result_button", [False, True])
+def test_browser_native_blob_download(browser, tmp_path, result_button):
     context = browser.new_context(accept_downloads=True)
     page = context.new_page()
-    html = """<form onsubmit='prepare(); return false'>
+    action = "showResult()" if result_button else "prepare()"
+    html = """<form onsubmit='SUBMIT_ACTION; return false'>
         <input id='main_page_text' type='text'><button type='submit'>Download</button>
         </form><script>function prepare() {
           const blob = new Blob([new Uint8Array(VIDEO_BYTES)], {type: 'video/mp4'});
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob); a.download = 'clip.mp4';
           document.body.appendChild(a); a.click();
-        }</script>""".replace("VIDEO_BYTES", str(list(VIDEO)))
+        }
+        function showResult() {
+          const button = document.createElement('button');
+          button.textContent = 'Download'; button.onclick = prepare;
+          document.body.appendChild(button);
+        }</script>""".replace("VIDEO_BYTES", str(list(VIDEO))).replace("SUBMIT_ACTION", action)
     context.route("**/*", lambda route: route.fulfill(content_type="text/html", body=html))
     try:
         result = _run_service(
-            page, SERVICES[0], "https://x.com/a/status/1", tmp_path, lambda message: None
+            page, SERVICES[0], "https://youtube.com/watch?v=abc", tmp_path, lambda message: None
         )
         assert result.read_bytes() == VIDEO
     finally:

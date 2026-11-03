@@ -31,6 +31,7 @@ class Service:
 
 
 SERVICES = (
+    Service("YouTube", "https://app.ytdown.to/tr37/", ("youtube.com", "youtu.be")),
     Service("X", "https://ssstwitter.com/", ("x.com", "twitter.com")),
     Service("TikTok", "https://ssstik.io/", ("tiktok.com",)),
     Service("Instagram", "https://reelsvideo.io/en-4", ("instagram.com",)),
@@ -57,7 +58,9 @@ def resolve_service(url: str) -> Service:
     for service in SERVICES:
         if any(host == domain or host.endswith("." + domain) for domain in service.domains):
             return service
-    raise DownloadError("Yalnızca X, TikTok, Instagram, Reddit ve Pinterest destekleniyor.")
+    raise DownloadError(
+        "Yalnızca YouTube, X, TikTok, Instagram, Reddit ve Pinterest destekleniyor."
+    )
 
 
 def is_mp4_video(path: Path) -> bool:
@@ -171,24 +174,28 @@ def _run_service(page: Page, service: Service, url: str, staging: Path,
     log("Gerekirse açılan tarayıcıdaki insan doğrulamasını tamamlayın (3 dakika).")
     field = page.locator(
         '#main_page_text, input[type="url"], input[placeholder="Paste here"], '
-        'input[name="url"], input[name="id"], input[type="text"]'
+        'input[name="url"], input[name="id"], input[type="text"], input[type="search"], '
+        'input:not([type])'
     ).filter(visible=True).first
     field.fill(url, timeout=180000)
     # Snapshot after a possible challenge page has been completed and replaced.
     initial = {link["url"] for link in page.evaluate(_LINKS)}
-    initial_buttons = set(page.locator("button:visible").all_text_contents())
+    page.locator("button:visible").evaluate_all(
+        "buttons => buttons.forEach(button => button.dataset.easyscrapeInitial = 'true')"
+    )
     form = field.locator("xpath=ancestor::form")
     submit = form.locator('button[type="submit"], input[type="submit"], #submit').first
     if submit.count():
         submit.click(timeout=180000)
     else:
         # Some services put their download action outside a form.
-        page.get_by_role("button", name=re.compile(r"^\s*(Download|İndir)\s*$", re.I)).first.click(
+        page.get_by_role(
+            "button", name=re.compile(r"^\s*(Download|İndir|Convert|Dönüştür)\s*$", re.I),
+        ).first.click(
             timeout=180000
         )
     deadline = time.monotonic() + 180
     attempted: set[str] = set()
-    clicked: set[str] = set()
     local = staging / "video.mp4"
     while time.monotonic() < deadline:
         if page.is_closed():
@@ -216,17 +223,20 @@ def _run_service(page: Page, service: Service, url: str, staging: Path,
                     except BrowserError:
                         pass
                     break
-        buttons = page.locator("button:visible")
+        buttons = page.locator(
+            "button:visible:not([data-easyscrape-initial]):not([data-easyscrape-clicked])"
+        )
         for index in range(buttons.count()):
             button = buttons.nth(index)
             label = button.text_content() or ""
-            if label in initial_buttons or label in clicked:
-                continue
             if re.search(r"mp3|photo|image", label, re.I):
                 continue
             if re.search(r"download|mp4|video|1080|720", label, re.I):
-                clicked.add(label)
-                button.click(timeout=5000, no_wait_after=True)
+                element = button.element_handle()
+                if element is None:
+                    continue
+                element.evaluate("button => button.dataset.easyscrapeClicked = 'true'")
+                element.click(timeout=5000, no_wait_after=True)
                 break
         # Playwright pumps browser events during this wait (including manual downloads).
         page.wait_for_timeout(500)

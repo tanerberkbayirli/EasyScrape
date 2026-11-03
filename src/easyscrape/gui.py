@@ -44,7 +44,8 @@ class App(tk.Tk):
         body.pack(fill="both", expand=True)
         header = ttk.Frame(body)
         header.pack(fill="x")
-        ttk.Label(header, text="X · TikTok · Instagram · Reddit · Pinterest").pack(side="left")
+        ttk.Label(header, text="YouTube · X · TikTok · Instagram · Reddit · Pinterest").pack(
+            side="left")
         ttk.Button(header, text="Ayarlar", command=self._open_settings).pack(side="right")
         self._destination_text = tk.StringVar()
         self._refresh_destination()

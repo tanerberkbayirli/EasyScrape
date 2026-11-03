@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "easyscrape"
 version = "0.2.0"
-description = "Beş sosyal platformun videolarını belirlenen servislerle Masaüstüne indirir"
+description = "Altı platformun videolarını belirlenen servislerle seçilen klasöre indirir"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
