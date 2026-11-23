@@ -2,6 +2,8 @@
 
 EasyScrape, bir bağlantıdan ya da bağlantı listesinden medya indiren bir Python aracıdır. Hem **komut satırı** hem de küçük bir **arayüz** ile kullanılır. İndirmeyi kendisi yapmaz; video ve ses için **yt-dlp**, görsel galerileri için **gallery-dl** kullanır ve her bağlantıyı uygun eklentiye yönlendirir. DRM veya erişim kısıtlarını aşmaz, telemetri göndermez.
 
+> **English summary:** EasyScrape is a Python CLI and small desktop GUI that routes URLs (YouTube, YouTube Music, Spotify, X, Instagram, TikTok, Pinterest, SoundCloud and more) to a plugin-based extractor layer built on yt-dlp and gallery-dl. It supports batch input, retrying failed items, audio conversion, and Spotify track/album/playlist matching via YouTube Music. It does not bypass DRM or access controls and sends no telemetry. Intended for personal use; respect each service's terms and copyright. The rest of this document is in Turkish.
+
 ## Özellikler
 
 - **Tek araçta çok platform:** YouTube, YouTube Music, Spotify, X, Instagram, TikTok, Pinterest, SoundCloud ve yt-dlp / gallery-dl'nin desteklediği diğer siteler.
@@ -31,6 +33,10 @@ python -m pip install -e ".[dev]"
 ```
 
 Çalışma zamanı bağımlılıkları: yt-dlp, gallery-dl, Rich, HTTPX, Mutagen, ytmusicapi ve TikTok için `curl-cffi`. `dev` ekstrası pytest, Ruff, mypy ve build araçlarını ekler.
+
+## Geçici e-posta
+
+`easyscrape-mail`, Mailwave üzerinden geçici bir e-posta adresi alır ve gelen kutusunu komut satırında gösterir. Bir mesaj beklemek ve içeriğini okumak için `easyscrape-mail --wait 60 --read` komutunu kullanabilirsiniz. `--json` ile çıktı JSON biçiminde alınabilir.
 
 ## Arayüzü açma
 

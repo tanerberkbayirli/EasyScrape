@@ -29,6 +29,7 @@ dev = [
 
 [project.scripts]
 easyscrape = "easyscrape.cli:main"
+easyscrape-mail = "easyscrape.mailwave:main"
 
 [project.gui-scripts]
 easyscrape-gui = "easyscrape.gui:main"
