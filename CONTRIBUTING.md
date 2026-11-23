@@ -1,9 +1,9 @@
-# Katkı rehberi
+# Contributing Guide
 
-Kurulum ve kontroller için README.md dosyasına bakın.
+See [README.md](README.md) for installation, usage, and verification commands.
 
-Platform-servis eşleştirmesi ve tarayıcı indirme akışı `src/easyscrape/downloader.py` içindedir. Kapsam YouTube, X, TikTok, Instagram, Reddit ve Pinterest videolarıdır. YouTube için yalnızca `https://app.ytdown.to/tr37/` kullanılır. Yeni bir genel çıkarıcı veya alternatif indirme sağlayıcısı eklemeyin.
+Platform-to-service mapping and the browser download pipeline live in `src/easyscrape/downloader.py`. The supported scope covers **YouTube**, **YouTube Shorts**, **X**, **TikTok**, **Instagram**, **Instagram Reels**, **Reddit**, **Snapchat Spotlight**, **Pinterest**, and **Threads** MP4 video downloads.
 
-Servis formu veya indirme bağlantıları değiştiğinde yerel HTML örnekleriyle tarayıcı testlerini güncelleyin. Testler gerçek üçüncü taraf servislerine, hesaplara veya indirilen kişisel medyaya bağımlı olmamalıdır. Başarısız ve kısmi dosyalar Masaüstüne teslim edilmemeli; mevcut dosyalar ezilmemelidir.
+When a service form or download link structure changes, update the browser integration tests in `tests/test_downloader.py` using local HTML fixtures. Automated tests must not depend on live third-party services, user accounts, or external media. Failed or partial files must never be written to the destination folder, and existing files must never be overwritten.
 
-CAPTCHA ve diğer erişim korumalarını aşan kod eklemeyin. Doğrulama kullanıcının açılan tarayıcıda tamamlayabileceği şekilde kalmalıdır.
+Do not add code that bypasses CAPTCHAs or anti-bot protections. Any human verification must remain interactive for the user in the opened browser window.

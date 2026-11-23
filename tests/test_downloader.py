@@ -124,7 +124,7 @@ def test_cli_rejects_old_features():
 
 def test_cli_download_error(capsys):
     assert main(["https://spotify.com/track/abc"]) == 1
-    assert "destekleniyor" in capsys.readouterr().err
+    assert "supported" in capsys.readouterr().err
 
 
 def test_cli_success(tmp_path, capsys):
@@ -146,7 +146,7 @@ def browser():
             except Error:
                 continue
         if instance is None:
-            pytest.fail("Tarayıcı testleri için: python -m playwright install chromium")
+            pytest.fail("For browser tests, run: python -m playwright install chromium")
         yield instance
         instance.close()
 

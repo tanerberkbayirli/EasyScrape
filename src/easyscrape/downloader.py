@@ -64,7 +64,7 @@ def resolve_service(url: str) -> Service:
         if parsed.port not in {None, 80, 443}:
             raise ValueError
     except ValueError as exc:
-        raise DownloadError("Geçerli bir HTTP(S) video bağlantısı girin.") from exc
+        raise DownloadError("Enter a valid HTTP(S) video URL.") from exc
     for service in SERVICES:
         if any(host == domain or host.endswith("." + domain) for domain in service.domains):
             if not service.path_prefixes or any(
@@ -72,8 +72,8 @@ def resolve_service(url: str) -> Service:
             ):
                 return service
     raise DownloadError(
-        "Yalnızca YouTube, YouTube Shorts, X, TikTok, Instagram, Instagram Reels, "
-        "Reddit, Snapchat Spotlight, Pinterest ve Threads destekleniyor."
+        "Only YouTube, YouTube Shorts, X, TikTok, Instagram, Instagram Reels, "
+        "Reddit, Snapchat Spotlight, Pinterest, and Threads are supported."
     )
 
 
@@ -94,7 +94,7 @@ def is_mp4_video(path: Path) -> bool:
 
 def save_video(source: Path, directory: Path, platform: str) -> Path:
     if not is_mp4_video(source):
-        raise DownloadError("Servis geçerli bir MP4 video döndürmedi.")
+        raise DownloadError("The service did not return a valid MP4 video.")
     directory.mkdir(parents=True, exist_ok=True)
     slug = re.sub(r"[^a-z0-9]+", "_", platform.lower()).strip("_")
     stem = f"{slug}_{time.strftime('%Y%m%d_%H%M%S')}"
@@ -111,7 +111,7 @@ def save_video(source: Path, directory: Path, platform: str) -> Path:
         except BaseException:
             target.unlink(missing_ok=True)
             raise
-    raise DownloadError("Masaüstünde benzersiz bir dosya adı oluşturulamadı.")
+    raise DownloadError("Could not create a unique filename in the destination folder.")
 
 
 def _launch(playwright: Playwright) -> Browser:
@@ -121,8 +121,8 @@ def _launch(playwright: Playwright) -> Browser:
         except BrowserError:
             continue
     raise DownloadError(
-        "Tarayıcı açılamadı. Edge/Chrome kurun veya "
-        "'python -m playwright install chromium' çalıştırın."
+        "Could not launch a browser. Install Edge/Chrome or run "
+        "'python -m playwright install chromium'."
     )
 
 
@@ -229,7 +229,7 @@ def _run_service(page: Page, service: Service, url: str, staging: Path,
         "page", lambda opened: opened.on("download", lambda download: downloads.append(download))
     )
     page.goto(service.url, wait_until="domcontentloaded", timeout=60000)
-    log("Gerekirse açılan tarayıcıdaki insan doğrulamasını tamamlayın (3 dakika).")
+    log("Complete any human verification in the opened browser if prompted (up to 3 minutes).")
     field = page.locator(
         '#main_page_text, input[type="url"], input[placeholder*="Paste" i], '
         'input[placeholder*="URL" i], input[placeholder*="link" i], '
@@ -251,7 +251,7 @@ def _run_service(page: Page, service: Service, url: str, staging: Path,
     next_button_click = 0.0
     while time.monotonic() < deadline:
         if page.is_closed():
-            raise DownloadError("İndirme tamamlanmadan tarayıcı kapatıldı.")
+            raise DownloadError("Browser was closed before the download completed.")
         while downloads:
             download = downloads.pop(0)
             if download.failure() is None:
@@ -263,7 +263,7 @@ def _run_service(page: Page, service: Service, url: str, staging: Path,
             if candidate in attempted:
                 continue
             attempted.add(candidate)
-            log("Servisin hazırladığı video indiriliyor...")
+            log("Downloading the prepared video from the service...")
             if _fetch_video(page, candidate, local):
                 return local
             # Let the service's own click handler/cookies handle attachment endpoints.
@@ -346,7 +346,8 @@ def _run_service(page: Page, service: Service, url: str, staging: Path,
         # Playwright pumps browser events during this wait (including manual downloads).
         page.wait_for_timeout(500)
     raise DownloadError(
-        f"{service.url} video döndürmedi. Bağlantıyı ve tarayıcıdaki hata/doğrulamayı kontrol edin."
+        f"{service.url} did not return a video. "
+        "Check the URL and any error or verification prompt in the browser."
     )
 
 
@@ -358,7 +359,7 @@ def download_video(
     directory = (
         output_directory if output_directory is not None else load_settings().output_directory
     )
-    log(f"{service.platform} tanındı → {service.url}")
+    log(f"{service.platform} detected → {service.url}")
     try:
         with tempfile.TemporaryDirectory(prefix="easyscrape-") as temporary, \
                 sync_playwright() as playwright:
@@ -371,4 +372,4 @@ def download_video(
             finally:
                 browser.close()
     except BrowserError as exc:
-        raise DownloadError(f"İndirme servisine erişilemedi: {exc.message}") from exc
+        raise DownloadError(f"Could not access the download service: {exc.message}") from exc

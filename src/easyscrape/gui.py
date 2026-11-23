@@ -197,7 +197,7 @@ class App(tk.Tk):
         ).pack(side="left", padx=(10, 0), pady=(2, 0))
 
         self._settings_btn = tk.Button(
-            header, text="⚙  Ayarlar", command=self._open_settings,
+            header, text="⚙  Settings", command=self._open_settings,
             bg=_SURFACE_ALT, fg=_TEXT, activebackground=_SURFACE_HOVER, activeforeground=_TEXT,
             relief="flat", bd=0, padx=12, pady=5, font=("Segoe UI", 9, "bold"), cursor="hand2",
         )
@@ -259,7 +259,7 @@ class App(tk.Tk):
         self.entry.focus_set()
 
         self._paste_btn = tk.Button(
-            action_row, text="Yapıştır", command=self._paste_url,
+            action_row, text="Paste", command=self._paste_url,
             bg=_SURFACE_ALT, fg=_CYAN, activebackground=_SURFACE_HOVER, activeforeground=_TEXT,
             relief="flat", bd=0, padx=12, pady=8, font=("Segoe UI", 9, "bold"), cursor="hand2",
         )
@@ -267,7 +267,7 @@ class App(tk.Tk):
         _bind_hover(self._paste_btn, _SURFACE_ALT, _SURFACE_HOVER)
 
         self.button = tk.Button(
-            action_row, text="İndir", command=self._start,
+            action_row, text="Download", command=self._start,
             bg=_ACCENT, fg="#FFFFFF", activebackground=_ACCENT_ACTIVE, activeforeground="#FFFFFF",
             disabledforeground="#94A3B8", relief="flat", bd=0, padx=20, pady=8,
             font=("Segoe UI", 10, "bold"), cursor="hand2",
@@ -279,7 +279,7 @@ class App(tk.Tk):
         self._progress = tk.Canvas(body, height=3, bg=_SURFACE_ALT, highlightthickness=0, bd=0)
         self._progress.pack(fill="x", pady=(2, 8))
 
-        self.status = tk.StringVar(value="Hazır. Video bağlantısını yapıştırıp İndir'e basın.")
+        self.status = tk.StringVar(value="Ready. Paste a video link and click Download.")
         self._status_label = tk.Label(
             body, textvariable=self.status, bg=_BG, fg=_MUTED,
             font=("Segoe UI", 9), anchor="w", justify="left", wraplength=600,
@@ -293,9 +293,9 @@ class App(tk.Tk):
             self, tearoff=False, bg=_SURFACE, fg=_TEXT,
             activebackground=_ACCENT, activeforeground="#FFFFFF", bd=0,
         )
-        self._menu.add_command(label="Ayarlar", command=self._open_settings)
+        self._menu.add_command(label="Settings", command=self._open_settings)
         self._menu.add_separator()
-        self._menu.add_command(label="Tamamen çık", command=self._exit)
+        self._menu.add_command(label="Quit completely", command=self._exit)
         self.bind("<Button-3>", lambda event: self._menu.tk_popup(event.x_root, event.y_root))
         self.after(100, self._drain)
         if activation is not None:
@@ -305,14 +305,14 @@ class App(tk.Tk):
 
     def _tint_status(self) -> None:
         text = self.status.get()
-        if text.startswith("Kaydedildi:"):
+        if text.startswith("Saved:") or text.startswith("Settings saved"):
             self._status_label.configure(fg=_SUCCESS)
-        elif text.startswith("İndirilemedi:") or "girin" in text or "kullanılıyor" in text:
+        elif text.startswith("Download failed:") or text.startswith("Enter a") or (
+            "already in use" in text
+        ):
             self._status_label.configure(fg=_ERROR)
         elif self._busy:
             self._status_label.configure(fg=_CYAN)
-        elif text.startswith("Ayarlar kaydedildi"):
-            self._status_label.configure(fg=_SUCCESS)
         else:
             self._status_label.configure(fg=_MUTED)
 
@@ -365,7 +365,7 @@ class App(tk.Tk):
             self._settings_window.lift()
 
     def _refresh_destination(self) -> None:
-        self._destination_text.set(f"Kayıt yeri: {self.preferences.output_directory}")
+        self._destination_text.set(f"Save to: {self.preferences.output_directory}")
 
     def _open_settings(self) -> None:
         if self._settings_window is not None and self._settings_window.winfo_exists():
@@ -376,7 +376,7 @@ class App(tk.Tk):
     def _apply_settings(self, preferences: Settings) -> None:
         directory = preferences.output_directory
         if not directory.is_absolute():
-            raise ValueError("Tam bir klasör yolu seçin.")
+            raise ValueError("Select a full folder path.")
         directory.mkdir(parents=True, exist_ok=True)
         # Detect unwritable folders before persisting them or changing the hotkey.
         with tempfile.TemporaryFile(dir=directory):
@@ -384,7 +384,7 @@ class App(tk.Tk):
         modifiers, key = parse_hotkey(preferences.hotkey)
         previous = self.preferences
         if self._activation is not None and not self._activation.change_hotkey(modifiers, key):
-            raise ValueError("Bu kısayol başka bir uygulamada kullanılıyor. Başka bir tuş seçin.")
+            raise ValueError("This shortcut is already used by another app. Choose another key.")
         try:
             save_settings(preferences)
         except OSError:
@@ -394,7 +394,7 @@ class App(tk.Tk):
         self.preferences = preferences
         self._refresh_destination()
         self._hotkey_label.configure(text=preferences.hotkey)
-        self.status.set(f"Ayarlar kaydedildi. Kısayol: {preferences.hotkey}")
+        self.status.set(f"Settings saved. Shortcut: {preferences.hotkey}")
 
     def _check_activation(self) -> None:
         if self._activation is not None and self._activation.consume_show():
@@ -406,14 +406,14 @@ class App(tk.Tk):
             return
         url = self.url.get().strip()
         if not url:
-            self.status.set("Bir video bağlantısı girin.")
+            self.status.set("Enter a video URL.")
             return
         self._busy = True
         self._anim_pos = 0.0
         self.button.configure(state="disabled", bg=_SURFACE_ALT)
         self._paste_btn.configure(state="disabled")
         self.entry.configure(state="disabled")
-        self.status.set("Servis açılıyor...")
+        self.status.set("Opening service...")
         self._animate_progress()
         threading.Thread(
             target=self._download, args=(url, self.preferences.output_directory), daemon=True,
@@ -426,11 +426,11 @@ class App(tk.Tk):
 
             try:
                 path = download_video(url, log=self._messages.put, output_directory=directory)
-                self._messages.put(f"Kaydedildi: {path}")
+                self._messages.put(f"Saved: {path}")
             except DownloadError as exc:
-                self._messages.put(f"İndirilemedi: {exc}")
+                self._messages.put(f"Download failed: {exc}")
         except (ImportError, OSError) as exc:
-            self._messages.put(f"İndirilemedi: {exc}")
+            self._messages.put(f"Download failed: {exc}")
         finally:
             self._messages.put(None)
 
@@ -453,7 +453,7 @@ class App(tk.Tk):
 
     def _close(self) -> None:
         if self._busy:
-            self.status.set("İndirmeyi durdurmak için açılan tarayıcıyı kapatın.")
+            self.status.set("Close the opened browser window to cancel the download.")
         else:
             if self._activation is not None:
                 self.withdraw()
@@ -462,7 +462,7 @@ class App(tk.Tk):
 
     def _exit(self) -> None:
         if self._busy:
-            self.status.set("İndirmeyi durdurmak için açılan tarayıcıyı kapatın.")
+            self.status.set("Close the opened browser window to cancel the download.")
         else:
             self.destroy()
 
@@ -471,7 +471,7 @@ class SettingsDialog(tk.Toplevel):
     def __init__(self, owner: App) -> None:
         super().__init__(owner)
         self.owner = owner
-        self.title("Ayarlar")
+        self.title("Settings")
         self.transient(owner)
         self.resizable(False, False)
         self.configure(bg=_BG)
@@ -503,7 +503,7 @@ class SettingsDialog(tk.Toplevel):
         body.pack(fill="both", expand=True)
 
         tk.Label(
-            body, text="Kayıt klasörü", bg=_BG, fg=_TEXT, font=("Segoe UI", 9, "bold"),
+            body, text="Save folder", bg=_BG, fg=_TEXT, font=("Segoe UI", 9, "bold"),
         ).pack(anchor="w")
         folder_row = tk.Frame(body, bg=_BG)
         folder_row.pack(fill="x", pady=(6, 16))
@@ -518,7 +518,7 @@ class SettingsDialog(tk.Toplevel):
             insertbackground=_CYAN, relief="flat", bd=0, font=("Segoe UI", 9),
         ).pack(fill="both", expand=True, padx=8, pady=2)
         browse_btn = tk.Button(
-            folder_row, text="Seç…", command=self._browse,
+            folder_row, text="Browse…", command=self._browse,
             bg="#0EA5E9", fg="#FFFFFF", activebackground="#0284C7", activeforeground="#FFFFFF",
             relief="flat", bd=0, padx=12, pady=5, font=("Segoe UI", 9, "bold"), cursor="hand2",
         )
@@ -526,7 +526,7 @@ class SettingsDialog(tk.Toplevel):
         _bind_hover(browse_btn, "#0EA5E9", "#38BDF8")
 
         tk.Label(
-            body, text="Uygulamayı açma kısayolu", bg=_BG, fg=_TEXT, font=("Segoe UI", 9, "bold"),
+            body, text="App activation shortcut", bg=_BG, fg=_TEXT, font=("Segoe UI", 9, "bold"),
         ).pack(anchor="w")
         shortcut_row = tk.Frame(body, bg=_SURFACE, padx=10, pady=8)
         shortcut_row.pack(fill="x", pady=(6, 12))
@@ -554,7 +554,7 @@ class SettingsDialog(tk.Toplevel):
         buttons = tk.Frame(body, bg=_BG)
         buttons.pack(fill="x")
         defaults_btn = tk.Button(
-            buttons, text="Varsayılanlara dön", command=self._defaults,
+            buttons, text="Reset defaults", command=self._defaults,
             bg=_SURFACE_ALT, fg=_MUTED, activebackground=_SURFACE_HOVER, activeforeground=_TEXT,
             relief="flat", bd=0, padx=12, pady=6, font=("Segoe UI", 9, "bold"), cursor="hand2",
         )
@@ -562,7 +562,7 @@ class SettingsDialog(tk.Toplevel):
         _bind_hover(defaults_btn, _SURFACE_ALT, _SURFACE_HOVER)
 
         save_btn = tk.Button(
-            buttons, text="Kaydet", command=self._save,
+            buttons, text="Save", command=self._save,
             bg=_SUCCESS_BTN, fg="#FFFFFF", activebackground=_SUCCESS_HOVER,
             activeforeground="#FFFFFF", relief="flat", bd=0, padx=16, pady=6,
             font=("Segoe UI", 9, "bold"), cursor="hand2",
@@ -571,7 +571,7 @@ class SettingsDialog(tk.Toplevel):
         _bind_hover(save_btn, _SUCCESS_BTN, _SUCCESS_HOVER)
 
         cancel_btn = tk.Button(
-            buttons, text="İptal", command=self.destroy,
+            buttons, text="Cancel", command=self.destroy,
             bg=_SURFACE_ALT, fg=_TEXT, activebackground=_SURFACE_HOVER, activeforeground=_TEXT,
             relief="flat", bd=0, padx=12, pady=6, font=("Segoe UI", 9, "bold"), cursor="hand2",
         )
@@ -589,7 +589,7 @@ class SettingsDialog(tk.Toplevel):
 
     def _browse(self) -> None:
         selected = filedialog.askdirectory(
-            parent=self, title="Kayıt klasörünü seçin", initialdir=self.folder.get(),
+            parent=self, title="Select save folder", initialdir=self.folder.get(),
         )
         if selected:
             self.folder.set(selected)
@@ -604,7 +604,7 @@ class SettingsDialog(tk.Toplevel):
     def _save(self) -> None:
         try:
             if not self.folder.get().strip():
-                raise ValueError("Bir kayıt klasörü seçin.")
+                raise ValueError("Select a save folder.")
             directory = Path(self.folder.get().strip()).expanduser()
             shortcut = "+".join(
                 [name for name, variable in self.modifiers.items() if variable.get()]
@@ -638,7 +638,7 @@ def main() -> int:
             activation=activation, background="--background" in sys.argv, preferences=preferences,
         )
         if activation is not None and not activation.listen():
-            app.status.set(f"{preferences.hotkey} başka bir uygulama tarafından kullanılıyor.")
+            app.status.set(f"{preferences.hotkey} is already in use by another application.")
         app.mainloop()
     finally:
         if activation is not None:

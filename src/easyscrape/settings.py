@@ -17,12 +17,12 @@ MODIFIERS = {"Ctrl": 0x2, "Shift": 0x4, "Alt": 0x1, "Win": 0x8}
 def parse_hotkey(value: str) -> tuple[int, int]:
     parts = [part.strip() for part in value.split("+")]
     if len(parts) < 2 or len(set(parts)) != len(parts):
-        raise ValueError("Bir tuş ve en az Ctrl, Alt veya Win seçin.")
+        raise ValueError("Select a key and at least one of Ctrl, Alt, or Win.")
     if parts[-1] not in KEYS or any(part not in MODIFIERS for part in parts[:-1]):
-        raise ValueError("Geçersiz kısayol. Harf, rakam veya F1–F24 seçin.")
+        raise ValueError("Invalid shortcut. Choose a letter, digit, or F1–F24.")
     modifiers = sum(MODIFIERS[part] for part in parts[:-1])
     if not modifiers & (0x1 | 0x2 | 0x8):
-        raise ValueError("Kısayolda Ctrl, Alt veya Win bulunmalı.")
+        raise ValueError("Shortcut must include Ctrl, Alt, or Win.")
     key = parts[-1]
     return modifiers, 0x70 + int(key[1:]) - 1 if key.startswith("F") and len(key) > 1 else ord(key)
 

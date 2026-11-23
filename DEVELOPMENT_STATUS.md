@@ -1,16 +1,16 @@
-# Geliştirme durumu
+# Development Status
 
-1.0.0 sürümü, on platform/video türünün (YouTube, YouTube Shorts, X, TikTok, Instagram, Instagram Reels, Reddit, Snapchat Spotlight, Pinterest, Threads) bağlantılarını canlı çalışması doğrulanmış indirme servislerine yönlendirir:
+Version **1.0.0** routes video links from ten supported platforms/variants to live-verified download services, prioritizes HD (**1080p / 720p**) MP4 streams, and provides a modern dark-themed desktop interface:
 
-- YouTube & YouTube Shorts → `https://vidssave.com/`
-- X / Twitter → `https://ssstwitter.com/`
-- TikTok → `https://ssstik.io/`
-- Instagram & Instagram Reels → `https://fastdl.app/en`
-- Reddit → `https://viddit.io/`
-- Snapchat Spotlight → `https://getindevice.com/snapchat-downloader/`
-- Pinterest → `https://pindown.io/`
-- Threads → `https://threadster.app/`
+- **YouTube & YouTube Shorts** → `https://vidssave.com/`
+- **X / Twitter** → `https://ssstwitter.com/`
+- **TikTok** → `https://ssstik.io/`
+- **Instagram & Instagram Reels** → `https://fastdl.app/en`
+- **Reddit** → `https://viddit.io/`
+- **Snapchat Spotlight** → `https://getindevice.com/snapchat-downloader/`
+- **Pinterest** → `https://pindown.io/`
+- **Threads** → `https://threadster.app/`
 
-CLI tek URL, Tk arayüzü tek bağlantı alanı sunar. Ayarlar menüsünden kayıt klasörü ve global kısayol seçilir; varsayılanlar Masaüstü ve Ctrl+Shift+D'dir. Seçimler kalıcıdır; kısayol yeniden başlatmadan değiştirilir. Windows arayüzü arka planda hazır bekler ve her gösterildiğinde sağ alta konumlanır.
+The CLI accepts a single URL, and the Tkinter desktop UI provides a single URL input with one-click paste, colorful platform badges, a neon download progress indicator, and a Settings dialog for customizing the save folder and global activation hotkey (defaults: **Desktop** and **`Ctrl+Shift+D`**). Preferences persist across restarts, and hotkey changes apply immediately without restarting. On Windows, the app remains resident in the background and positions itself at the bottom-right corner whenever activated.
 
-Çalışma zamanı bağımlılıkları Playwright ve HTTPX'tir. Edge/Chrome veya ayrıca kurulan Chromium kullanılır. Eski çıkarıcılar ve bunlara ait testler kaldırılmıştır.
+Runtime dependencies are `playwright` and `httpx`. Microsoft Edge, Google Chrome, or Playwright Chromium is used for browser automation. Legacy extractors and their associated tests have been removed.
