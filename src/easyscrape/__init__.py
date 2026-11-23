@@ -1,3 +1,3 @@
-"""EasyScrape: six video platforms with their selected download services."""
+"""EasyScrape: ten video platforms with their selected download services."""
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"

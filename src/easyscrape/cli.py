@@ -16,7 +16,10 @@ def main(argv: list[str] | None = None) -> int:
             reconfigure(errors="replace")
     parser = argparse.ArgumentParser(
         prog="easyscrape",
-        description="YouTube, X, TikTok, Instagram, Reddit ve Pinterest videosunu indir."
+        description=(
+            "YouTube, YouTube Shorts, X, TikTok, Instagram, Instagram Reels, "
+            "Reddit, Snapchat Spotlight, Pinterest ve Threads videosunu indir."
+        ),
     )
     parser.add_argument("url", help="İndirilecek videonun bağlantısı")
     parser.add_argument("--version", action="version", version=__version__)

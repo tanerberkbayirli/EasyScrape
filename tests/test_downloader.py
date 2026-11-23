@@ -35,7 +35,8 @@ VIDEO = box(b"ftyp", b"isom\0\0\0\0isommp42") + box(
 @pytest.mark.parametrize(("url", "platform"), [
     ("https://www.youtube.com/watch?v=abc", "YouTube"),
     ("https://youtu.be/abc", "YouTube"),
-    ("https://www.youtube.com/shorts/abc", "YouTube"),
+    ("https://www.youtube.com/shorts/abc", "YouTube Shorts"),
+    ("https://m.youtube.com/shorts/abc", "YouTube Shorts"),
     ("https://m.youtube.com/watch?v=abc", "YouTube"),
     ("https://music.youtube.com/watch?v=abc", "YouTube"),
     ("https://x.com/a/status/1", "X"),
@@ -43,20 +44,28 @@ VIDEO = box(b"ftyp", b"isom\0\0\0\0isommp42") + box(
     ("https://www.tiktok.com/@a/video/1", "TikTok"),
     ("https://vm.tiktok.com/abc/", "TikTok"),
     ("https://vt.tiktok.com/abc/", "TikTok"),
-    ("https://www.instagram.com/reel/abc/", "Instagram"),
+    ("https://www.instagram.com/reel/abc/", "Instagram Reels"),
+    ("https://www.instagram.com/reels/abc/", "Instagram Reels"),
+    ("https://www.instagram.com/p/abc/", "Instagram"),
+    ("https://www.instagram.com/tv/abc/", "Instagram"),
     ("https://www.reddit.com/r/test/comments/abc/title", "Reddit"),
     ("https://redd.it/abc", "Reddit"),
+    ("https://www.snapchat.com/spotlight/abc", "Snapchat Spotlight"),
+    ("https://www.snapchat.com/@user/spotlight/abc", "Snapchat Spotlight"),
+    ("https://story.snapchat.com/s/abc", "Snapchat Spotlight"),
     ("https://www.pinterest.com/pin/123/", "Pinterest"),
     ("https://pin.it/abc", "Pinterest"),
     ("https://tr.pinterest.com/pin/1/", "Pinterest"),
     ("https://www.pinterest.com.tr/pin/1/", "Pinterest"),
+    ("https://www.threads.net/@user/post/abc", "Threads"),
+    ("https://www.threads.com/@user/post/abc", "Threads"),
     (" HTTPS://X.COM/a/status/1 ", "X"),
 ])
 def test_platform_detection(url, platform):
     service = resolve_service(url)
     assert service.platform == platform
-    if platform == "YouTube":
-        assert service.url == "https://app.ytdown.to/tr37/"
+    if platform in {"YouTube", "YouTube Shorts"}:
+        assert service.url == "https://vidssave.com/"
 
 
 @pytest.mark.parametrize("url", [
@@ -249,3 +258,40 @@ def test_redirected_windows_desktop(tmp_path):
     redirected = tmp_path / "OneDrive" / "Masaüstü"
     with patch.object(winreg, "QueryValueEx", return_value=(str(redirected), winreg.REG_SZ)):
         assert desktop_directory() == redirected
+
+
+def test_prefers_hd_over_144p_row_buttons(browser, tmp_path):
+    context = browser.new_context(accept_downloads=True)
+    page = context.new_page()
+    html = """<form onsubmit='showRows(); return false'>
+        <input id='main_page_text' type='text'><button type='submit'>Download</button>
+        </form><div id='rows'></div>
+        <script>
+        function downloadQuality(q) {
+          window.selectedQuality = q;
+          const blob = new Blob([new Uint8Array(VIDEO_BYTES)], {type: 'video/mp4'});
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob); a.download = q + '.mp4';
+          document.body.appendChild(a); a.click();
+        }
+        function showRows() {
+          document.querySelector('#rows').innerHTML = `
+            <div><span>MP4</span><span>144P</span><span>5.31 MB</span>
+              <div><button onclick="downloadQuality('144P')">FastDownload</button></div>
+            </div>
+            <div><span>MP4</span><span>720P</span><span>28.58 MB</span>
+              <div><button onclick="downloadQuality('720P')">FastDownload</button></div>
+            </div>
+            <div><span>MP4</span><span>1080P</span><span>80.04 MB</span>
+              <div><button onclick="downloadQuality('1080P')">FastDownload</button></div>
+            </div>`;
+        }</script>""".replace("VIDEO_BYTES", str(list(VIDEO)))
+    context.route("**/*", lambda route: route.fulfill(content_type="text/html", body=html))
+    try:
+        result = _run_service(
+            page, SERVICES[1], "https://youtube.com/watch?v=abc", tmp_path, lambda message: None
+        )
+        assert result.read_bytes() == VIDEO
+        assert page.evaluate("window.selectedQuality") == "1080P"
+    finally:
+        context.close()

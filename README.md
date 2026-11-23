@@ -3,13 +3,17 @@
 Bir video bağlantısı yapıştırın; EasyScrape platformu tanır, ilgili indirme servisine gönderir ve MP4 videoyu seçtiğiniz klasöre kaydeder. Varsayılan kayıt yeri Masaüstüdür.
 
 - X / Twitter → https://ssstwitter.com/
-- YouTube (youtu.be ve Shorts dahil) → https://app.ytdown.to/tr37/
+- YouTube (youtu.be dahil) → https://vidssave.com/
+- YouTube Shorts → https://vidssave.com/
 - TikTok (vm/vt kısa linkleri dahil) → https://ssstik.io/
-- Instagram → https://reelsvideo.io/en-4
-- Reddit (redd.it kısa linkleri dahil) → https://redvid.io/
-- Pinterest (pin.it kısa linkleri dahil) → https://redvid.io/pinterest-downloader
+- Instagram → https://fastdl.app/en
+- Instagram Reels → https://fastdl.app/en
+- Reddit (redd.it kısa linkleri dahil) → https://viddit.io/
+- Snapchat Spotlight → https://getindevice.com/snapchat-downloader/
+- Pinterest (pin.it kısa linkleri dahil) → https://pindown.io/
+- Threads (threads.net ve threads.com) → https://threadster.app/
 
-Yalnızca bu altı platform ve video indirme desteklenir. Eski yt-dlp/gallery-dl adaptörleri, Spotify, fotoğraf, ses dönüştürme, dosyadan/toplu indirme, kalite seçenekleri, çerez seçimi, rapor ve geçmiş özellikleri kaldırılmıştır.
+Yalnızca bu on platform/video türü ve MP4 video indirme desteklenir. Eski yt-dlp/gallery-dl adaptörleri, Spotify, fotoğraf, ses dönüştürme, dosyadan/toplu indirme, kalite seçenekleri, çerez seçimi, rapor ve geçmiş özellikleri kaldırılmıştır.
 
 ## Kurulum ve kullanım
 
